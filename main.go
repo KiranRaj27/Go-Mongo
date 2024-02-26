@@ -1,17 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/Kiranraj27/mongo-go/controllers"
 	"github.com/julienschmidt/httprouter"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
-	fmt.Println("hello")
 	router := httprouter.New()
 	uc := controllers.NewUserController(getSession())
 	router.GET("/user/:id", uc.Getuser)
@@ -20,11 +21,12 @@ func main() {
 	http.ListenAndServe("localhost:8000", router)
 }
 
-func getSession() *mgo.Session {
-	s, err := mgo.Dial("mongodb+srv://admin:kichu123@myatlasclusteredu.5ekwdbt.mongodb.net/golang")
+func getSession() *mongo.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb+srv://admin:kichu123@myatlasclusteredu.5ekwdbt.mongodb.net/golang"))
 	if err != nil {
 		fmt.Println(err)
-		log.Fatal("Something went wrong")
 	}
-	return s
+	return client
 }

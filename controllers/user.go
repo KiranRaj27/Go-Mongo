@@ -1,21 +1,23 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/Kiranraj27/mongo-go/models"
 	"github.com/julienschmidt/httprouter"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type UserController struct {
-	session *mgo.Session
+	session *mongo.Client
 }
 
-func NewUserController(s *mgo.Session) *UserController {
+func NewUserController(s *mongo.Client) *UserController {
 	return &UserController{s}
 }
 
@@ -25,13 +27,15 @@ func (uc UserController) Getuser(w http.ResponseWriter, r *http.Request, p httpr
 		w.WriteHeader(http.StatusNotFound)
 	}
 
-	oid := bson.ObjectIdHex(id)
-
-	u := models.User{}
-
-	if err := uc.session.DB("mongo-golang").C("users").FindId(oid).One(&u); err != nil {
-		w.WriteHeader(404)
-		return
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		fmt.Println(err)
+	}
+	u := models.UserResponse{}
+	collection := uc.session.Database("golang").Collection("users")
+	err = collection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&u)
+	if err != nil {
+		fmt.Println(err)
 	}
 
 	uj, err := json.Marshal(u)
@@ -48,11 +52,15 @@ func (uc UserController) CreateUser(w http.ResponseWriter, r *http.Request, _ ht
 	u := models.User{}
 
 	json.NewDecoder(r.Body).Decode(&u)
-	u.Id = bson.NewObjectId()
 
-	uc.session.DB("mongo-golang").C("users").Insert(u)
+	collection := uc.session.Database("golang").Collection("users")
 
-	uj, err := json.Marshal(u)
+	res, err := collection.InsertOne(context.Background(), u)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	uj, err := json.Marshal(res)
 
 	if err != nil {
 		fmt.Println(err)
@@ -61,5 +69,4 @@ func (uc UserController) CreateUser(w http.ResponseWriter, r *http.Request, _ ht
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "%s\n", uj)
-
 }
